@@ -100,6 +100,63 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 **This completes Phase 1's original 9-step roadmap**: FastAPI scaffold → mock data → product search → policy RAG → order tool → LangGraph tool-calling agent → chat API. End-to-end flow now matches the architecture sketched in the very first message of this project.
 
+## Phase 3 — Observability with Langfuse
+
+### Step 1 complete: LangGraph tracing via Langfuse's LangChain integration
+Used Langfuse's own published skill (`github.com/langfuse/skills`) as a reference — verified it was a legitimate vendor-published skill (real repo, real SKILL.md, consistent with their actual docs) before following any of it, treating it as a resource to evaluate rather than instructions to blindly execute.
+
+**Implementation:**
+- `graph.py`: Langfuse's `CallbackHandler` is wired in conditionally — only activates if both `LANGFUSE_PUBLIC_KEY` and `LANGFUSE_SECRET_KEY` are set; otherwise a clear console notice and the agent runs identically without tracing. Verified both paths work (with and without keys).
+- `run_agent()` now takes an optional `session_id`, passed through as `config={"run_name": ..., "metadata": {"langfuse_session_id": ...}}`. `session_id` is generated once per widget mount (`crypto.randomUUID()`) in `ShopAgent.tsx` and sent with every `/chat` request.
+- **Real gap surfaced by this work, not previously noted:** the backend has no multi-turn conversation memory at all — every request is a fresh `[System, Human]` message pair. `session_id` only *groups* independent traces for visualization in Langfuse's Sessions view; it does not give the agent actual memory of prior messages. Real conversation memory is a separate, deeper architectural gap, out of scope for "add tracing."
+- **Real dependency bug found and fixed:** `langfuse.langchain.CallbackHandler` requires the full `langchain` meta-package, not just `langchain-core`/`langchain-groq` (which we already had) — import failed with `ModuleNotFoundError` until `langchain` was installed explicitly.
+
+**Self-audit performed (per the skill's required loop — run it, fetch the real trace back, check against live best-practices doc, don't just assume it worked):** used `langfuse-cli` (via `npx`) to fetch the actual trace's observations after a real test request. Confirmed: span hierarchy correctly mirrors the actual graph execution (`agent → tools_condition/generation → tools/tool-call → agent → generation`), `GENERATION`/`TOOL` types auto-assigned correctly, token usage captured automatically — all via the framework integration, no manual instrumentation needed.
+
+**Two gaps found and deliberately deferred, not silently ignored:**
+1. Root trace input/output is the full raw LangChain message dump (readability issue in the dashboard), not a clean question/answer pair. Proper fix needs a manual span wrapper + `propagate_attributes()` — real added complexity for a cosmetic issue; deferred.
+2. Cost isn't calculated (tokens are, cost is `null`) — Groq's `openai/gpt-oss-20b` likely isn't in Langfuse's default pricing catalog; fixable via a dashboard setting, not code.
+
+Also noted for later: mock customer PII (email) currently flows into trace data unmasked — harmless with fake data, a real Phase 5 (guardrails) concern once real customer data exists.
+
+## Phase 2 — React Widget
+
+### Step 1 complete: Vite + React + TS scaffold, `<ShopAgent />` component
+`packages/react/` — Vite scaffold (chose Vite over Next.js: no need for SSR/routing in an embeddable chat widget; near-instant HMR via esbuild). Monorepo layout confirmed: `backend/` and `packages/react/` side by side in one repo, matching the original target architecture.
+
+`ShopAgent.tsx`: `ShopAgentProps` mirrors the original widget API (`apiKey`, `apiUrl`, `storeId`) even though `apiKey`/`storeId` aren't wired to anything yet (no backend auth/multi-tenancy exists yet either — same honest-placeholder pattern as `store_id` in the agent tools). Optimistic UI update (append the user's message before the network call resolves). Inline styles instead of a CSS file/classes — deliberate, since this component will eventually be embedded on arbitrary third-party store pages via `<script>` tag, and class-based CSS risks colliding with the host page's own styles.
+
+**Verified in a real headless browser (Playwright), not just "should work":** initial render screenshot confirmed the chat UI; a real end-to-end message ("Where is order ORD1001?") was sent and a correct, grounded reply rendered.
+
+**Two real bugs found and fixed via that browser test:**
+1. **CORS blocked the request** (`localhost:5173` widget → `127.0.0.1:8010` API, different origins). Fixed with `CORSMiddleware(allow_origins=["*"])`. Worth remembering the reasoning, since it inverts the usual advice: normally wildcard CORS in production is a smell, but ShopAgent-OS is an embeddable widget meant to run on arbitrary, unknown store domains — there's no fixed origin list to enumerate. The real access-control boundary here has to be the API key check (Phase 5), not CORS; CORS and API-key auth solve different problems, and this architecture leans on the latter.
+2. **Raw Markdown leaking into the UI** (`**ORD1001**` shown literally, since the widget doesn't render Markdown but the LLM naturally produces it). Fixed by explicitly instructing the system prompt to reply in plain text — simpler and more proportionate right now than adding a Markdown-rendering dependency to the widget, which is a reasonable thing to revisit during later UI polish.
+
+### Follow-up: floating launcher pattern (fixed-position overlay, not inline)
+Corrected an architectural gap, not just cosmetics: the widget originally rendered inline in the page flow. Real embeddable widgets must float as an overlay regardless of where they're mounted in a host page's DOM — fixed with `position: fixed; bottom; right; zIndex: 999999` on an outer wrapper containing a launcher button (`isOpen` toggles a chat panel above it) and, when open, the existing chat panel. Verified in a real browser across all 4 states (closed → open → message sent and grounded reply shown → closed again) with a simulated "host page" (`App.tsx` now has real surrounding content) to prove the float-over-content behavior, not just the widget in isolation. Conversation state (`messages`) persists across close/reopen since only visibility toggles, not the component's state — the right behavior for a chat widget.
+
+### Follow-up: design polish — icon library + configurable brand color
+Added `react-icons` (Feather set: `FiMessageCircle`, `FiX`, `FiSend`) instead of emoji characters for the launcher/close/send icons. Added an optional `primaryColor` prop (default `#6366F1`) threaded through every accent surface (launcher, header, user bubbles, send button) — this isn't cosmetic polish alone, it's a real requirement for a white-label embeddable widget: every store owner has different brand colors, so a single hardcoded accent color would look out of place on most real sites. Also added an empty-state welcome message so the panel doesn't render as a bare white box before the first message. Verified with a deliberately different color (`#16A34A`, green) in the demo app to prove the prop actually re-themes the whole component, not just visually inspecting the default.
+
+## Interview Questions — Phase 2, Step 1
+
+**Basic**
+1. Why Vite instead of Next.js for this widget specifically?
+2. Why are `apiKey` and `storeId` accepted as props but not used anywhere yet?
+3. What does "optimistic UI update" mean, and where does it happen in `ShopAgent.tsx`?
+4. What is a CORS preflight request, and what was actually missing that caused it to fail?
+5. Why did Markdown syntax show up literally in the chat bubble instead of rendering as bold text?
+
+**Intermediate**
+1. Why is `allow_origins=["*"]` arguably the *correct* choice here rather than a shortcut, given what this widget is for?
+2. Why use inline styles instead of a CSS file for this component?
+3. What's the tradeoff between fixing the Markdown issue via the system prompt vs. adding a Markdown-rendering library to the widget?
+4. What would break if the `finally` block were removed from `sendMessage`?
+
+**Architecture**
+1. If a store owner embeds this widget via a plain `<script>` tag (not React) as described in the original brief, what would need to exist that doesn't yet?
+2. Trace what "access control" actually means for this system once Phase 5's API keys exist — what stops Store A's widget from reading Store B's data, concretely?
+
 ## Phase 1 Wrap-up — Interview Questions (whole pipeline)
 
 **Basic**
