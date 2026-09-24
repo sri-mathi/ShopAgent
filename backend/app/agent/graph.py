@@ -13,7 +13,9 @@ SYSTEM_PROMPT = (
     "Answer using only information returned by your tools - never invent product "
     "details, prices, order statuses, or policy terms. If a tool returns an error "
     "or no results, say so honestly instead of guessing. Keep responses concise "
-    "and friendly."
+    "and friendly. Respond in plain text only - do not use Markdown formatting "
+    "(no **, #, or bullet dashes), since the client displaying your reply does "
+    "not render Markdown."
 )
 
 llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0)
