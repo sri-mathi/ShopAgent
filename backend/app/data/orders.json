@@ -1,0 +1,53 @@
+[
+  {
+    "order_id": "ORD1001",
+    "customer_email": "alice@example.com",
+    "status": "shipped",
+    "items": [
+      { "product_id": "P001", "name": "Nova Runner Sneakers", "quantity": 1 }
+    ],
+    "estimated_delivery": "2026-09-22",
+    "tracking_number": "TRK-88213"
+  },
+  {
+    "order_id": "ORD1002",
+    "customer_email": "bob@example.com",
+    "status": "processing",
+    "items": [
+      { "product_id": "P003", "name": "SonicWave Bluetooth Earbuds", "quantity": 2 }
+    ],
+    "estimated_delivery": "2026-09-25",
+    "tracking_number": null
+  },
+  {
+    "order_id": "ORD1003",
+    "customer_email": "alice@example.com",
+    "status": "delivered",
+    "items": [
+      { "product_id": "P006", "name": "BrewMaster Drip Coffee Maker", "quantity": 1 }
+    ],
+    "estimated_delivery": "2026-09-10",
+    "tracking_number": "TRK-77410"
+  },
+  {
+    "order_id": "ORD1004",
+    "customer_email": "carla@example.com",
+    "status": "cancelled",
+    "items": [
+      { "product_id": "P004", "name": "PulseFit Smartwatch", "quantity": 1 }
+    ],
+    "estimated_delivery": null,
+    "tracking_number": null
+  },
+  {
+    "order_id": "ORD1005",
+    "customer_email": "dave@example.com",
+    "status": "shipped",
+    "items": [
+      { "product_id": "P002", "name": "Trailblazer Hiking Boots", "quantity": 1 },
+      { "product_id": "P008", "name": "AeroFlex Yoga Mat", "quantity": 1 }
+    ],
+    "estimated_delivery": "2026-09-21",
+    "tracking_number": "TRK-90112"
+  }
+]

@@ -1,0 +1,82 @@
+[
+  {
+    "id": "P001",
+    "name": "Nova Runner Sneakers",
+    "category": "shoes",
+    "price": 74.99,
+    "color": "red",
+    "tags": ["running", "sneakers", "lightweight"],
+    "in_stock": true,
+    "description": "Lightweight running shoes with breathable mesh, designed for daily training."
+  },
+  {
+    "id": "P002",
+    "name": "Trailblazer Hiking Boots",
+    "category": "shoes",
+    "price": 129.99,
+    "color": "brown",
+    "tags": ["hiking", "boots", "outdoor"],
+    "in_stock": true,
+    "description": "Waterproof hiking boots with reinforced ankle support for rugged trails."
+  },
+  {
+    "id": "P003",
+    "name": "SonicWave Bluetooth Earbuds",
+    "category": "electronics",
+    "price": 49.99,
+    "color": "black",
+    "tags": ["audio", "wireless", "earbuds"],
+    "in_stock": true,
+    "description": "Compact wireless earbuds with 20-hour battery life and noise isolation."
+  },
+  {
+    "id": "P004",
+    "name": "PulseFit Smartwatch",
+    "category": "electronics",
+    "price": 159.99,
+    "color": "black",
+    "tags": ["wearable", "fitness", "smartwatch"],
+    "in_stock": false,
+    "description": "Tracks heart rate, sleep, and workouts with a 7-day battery life."
+  },
+  {
+    "id": "P005",
+    "name": "Urban Sprint Sneakers",
+    "category": "shoes",
+    "price": 65.00,
+    "color": "red",
+    "tags": ["running", "sneakers", "casual"],
+    "in_stock": true,
+    "description": "Everyday running sneakers built for comfort on city streets."
+  },
+  {
+    "id": "P006",
+    "name": "BrewMaster Drip Coffee Maker",
+    "category": "home",
+    "price": 39.99,
+    "color": "white",
+    "tags": ["kitchen", "coffee", "appliance"],
+    "in_stock": true,
+    "description": "12-cup programmable coffee maker with auto shut-off."
+  },
+  {
+    "id": "P007",
+    "name": "GlowLite Desk Lamp",
+    "category": "home",
+    "price": 24.50,
+    "color": "silver",
+    "tags": ["lighting", "desk", "office"],
+    "in_stock": true,
+    "description": "Adjustable LED desk lamp with three brightness levels."
+  },
+  {
+    "id": "P008",
+    "name": "AeroFlex Yoga Mat",
+    "category": "fitness",
+    "price": 29.99,
+    "color": "purple",
+    "tags": ["yoga", "fitness", "exercise"],
+    "in_stock": true,
+    "description": "Non-slip yoga mat with extra cushioning for joint support."
+  }
+]
