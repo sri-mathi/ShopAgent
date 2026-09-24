@@ -1,2 +1,8 @@
 fastapi==0.115.0
 uvicorn[standard]==0.30.6
+groq==1.7.0
+python-dotenv==1.0.1
+sentence-transformers==6.1.0
+chromadb==1.5.9
+langgraph==1.2.12
+langchain-groq==1.1.3
