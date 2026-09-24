@@ -21,6 +21,7 @@ def health_check() -> dict[str, str]:
 
 class ChatRequest(BaseModel):
     message: str
+    session_id: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -30,7 +31,7 @@ class ChatResponse(BaseModel):
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest) -> ChatResponse:
     try:
-        reply = run_agent(request.message)
+        reply = run_agent(request.message, session_id=request.session_id)
     except Exception:
         raise HTTPException(
             status_code=500,

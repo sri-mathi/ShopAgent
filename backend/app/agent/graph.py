@@ -1,3 +1,5 @@
+import os
+
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
@@ -7,6 +9,18 @@ from langgraph.prebuilt import ToolNode, tools_condition
 from app.agent.tools import TOOLS
 
 load_dotenv()
+
+LANGFUSE_ENABLED = bool(os.environ.get("LANGFUSE_PUBLIC_KEY")) and bool(
+    os.environ.get("LANGFUSE_SECRET_KEY")
+)
+
+if LANGFUSE_ENABLED:
+    from langfuse.langchain import CallbackHandler
+
+    _langfuse_handler = CallbackHandler()
+else:
+    _langfuse_handler = None
+    print("Langfuse credentials not set - tracing disabled, agent runs normally.")
 
 SYSTEM_PROMPT = (
     "You are ShopAgent, a helpful customer support assistant for an online store. "
@@ -38,9 +52,16 @@ graph.add_edge("tools", "agent")
 app = graph.compile()
 
 
-def run_agent(user_message: str) -> str:
+def run_agent(user_message: str, session_id: str | None = None) -> str:
+    config: dict = {"run_name": "shopagent-chat-response"}
+    if _langfuse_handler:
+        config["callbacks"] = [_langfuse_handler]
+        if session_id:
+            config["metadata"] = {"langfuse_session_id": session_id}
+
     result = app.invoke(
-        {"messages": [SystemMessage(SYSTEM_PROMPT), HumanMessage(user_message)]}
+        {"messages": [SystemMessage(SYSTEM_PROMPT), HumanMessage(user_message)]},
+        config=config,
     )
     return result["messages"][-1].content
 
