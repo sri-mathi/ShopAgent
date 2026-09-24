@@ -18,6 +18,7 @@ export function ShopAgent({ apiUrl, primaryColor = '#6366F1' }: ShopAgentProps) 
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const [sessionId] = useState(() => crypto.randomUUID())
 
   async function sendMessage() {
     const text = input.trim()
@@ -31,7 +32,7 @@ export function ShopAgent({ apiUrl, primaryColor = '#6366F1' }: ShopAgentProps) 
       const response = await fetch(`${apiUrl}/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text }),
+        body: JSON.stringify({ message: text, session_id: sessionId }),
       })
 
       if (!response.ok) {
