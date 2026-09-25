@@ -14,6 +14,11 @@ function App() {
         apiKey={import.meta.env.VITE_SHOPAGENT_API_KEY}
         storeId="store_mock_001"
         primaryColor="#16A34A"
+        onMessage={(exchange) => {
+          // Stand-in for "call your own backend/DB here" - a real integrator
+          // would POST `exchange` to their own API instead of logging it.
+          console.log('CONVERSATION_EXCHANGE', JSON.stringify(exchange))
+        }}
       />
     </div>
   )

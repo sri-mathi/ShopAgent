@@ -6,6 +6,13 @@ export interface ShopAgentProps {
   apiKey: string
   storeId?: string
   primaryColor?: string
+  /** If your site already has the customer logged in, pass their email here
+   * so the agent can verify orders automatically instead of asking in chat. */
+  customerEmail?: string
+  /** Fires after each successful exchange. Use this to store the conversation
+   * in your own database/analytics - the widget itself keeps no history once
+   * the page is closed or refreshed. */
+  onMessage?: (exchange: { userMessage: string; reply: string; sessionId: string }) => void
 }
 
 interface ChatMessage {
@@ -13,7 +20,13 @@ interface ChatMessage {
   content: string
 }
 
-export function ShopAgent({ apiUrl, apiKey, primaryColor = '#6366F1' }: ShopAgentProps) {
+export function ShopAgent({
+  apiUrl,
+  apiKey,
+  primaryColor = '#6366F1',
+  customerEmail,
+  onMessage,
+}: ShopAgentProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -35,7 +48,11 @@ export function ShopAgent({ apiUrl, apiKey, primaryColor = '#6366F1' }: ShopAgen
           'Content-Type': 'application/json',
           Authorization: `Bearer ${apiKey}`,
         },
-        body: JSON.stringify({ message: text, session_id: sessionId }),
+        body: JSON.stringify({
+          message: text,
+          session_id: sessionId,
+          customer_email: customerEmail,
+        }),
       })
 
       if (!response.ok) {
@@ -44,6 +61,7 @@ export function ShopAgent({ apiUrl, apiKey, primaryColor = '#6366F1' }: ShopAgen
 
       const data = await response.json()
       setMessages((prev) => [...prev, { role: 'assistant', content: data.reply }])
+      onMessage?.({ userMessage: text, reply: data.reply, sessionId })
     } catch {
       setMessages((prev) => [
         ...prev,
