@@ -100,6 +100,34 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 **This completes Phase 1's original 9-step roadmap**: FastAPI scaffold → mock data → product search → policy RAG → order tool → LangGraph tool-calling agent → chat API. End-to-end flow now matches the architecture sketched in the very first message of this project.
 
+## Phase 4 — Evaluation with DeepEval
+
+### Step 1 complete: tool-selection + policy-grounding evals
+New top-level `evals/` folder (matches original target architecture — sibling to `backend/`, `packages/`, not buried inside either). `conftest.py` adds `backend/` to `sys.path` so eval tests can import `app.*` directly.
+
+**Tool-selection tests** (`test_tool_selection.py`) — no LLM judge needed at all: streams the graph up to the first `agent` node's decision and asserts the exact tool name called matches expectation, for 6 real questions covering all three tools. All 6 passed.
+
+**Policy-grounding tests** (`test_policy_grounding.py`) — DeepEval's `FaithfulnessMetric`, checking the agent's actual answer doesn't contradict what was actually retrieved from `policies.md` (via `retrieval_context`). All 3 passed with a real score of 1.0 each (threshold was 0.7) — actual DeepEval judge reasoning: "no contradictions, indicating perfect faithfulness."
+
+**Judge model design decision:** `judge_model.py` wraps `ChatGroq` via DeepEval's `DeepEvalBaseLLM` interface instead of using DeepEval's OpenAI default — reuses the same `GROQ_API_KEY` the agent already needs, consistent with the BYO-credentials principle (no new required external service just for evals). Uses `openai/gpt-oss-120b` (larger than the agent's own `openai/gpt-oss-20b`) as judge specifically to reduce same-model self-evaluation bias — a model judging its own smaller sibling's outputs is a sounder setup than a model judging itself.
+
+**Deliberately deferred:** the third original eval category, prompt-injection/safety, is paired with Phase 5 (guardrails) instead of built now — testing injection resistance before any defense exists would only prove "yes, currently vulnerable," which isn't informative until there's a guardrail to measure against.
+
+## Interview Questions — Phase 4, Step 1
+
+**Basic**
+1. Why does the tool-selection test need no LLM judge, while the grounding test does?
+2. What does the `FaithfulnessMetric` actually check, concretely?
+3. Why did we wrap `ChatGroq` as a judge instead of using DeepEval's default OpenAI judge?
+
+**Intermediate**
+1. Why use a *larger* Groq model as judge instead of reusing the same `openai/gpt-oss-20b` the agent itself uses?
+2. Why is testing prompt-injection safety before Phase 5 guardrails exist not very informative?
+3. What would a failing faithfulness score (e.g. 0.3) actually indicate about the agent's behavior?
+
+**Architecture**
+1. `evals/` imports from `app.*` via a `sys.path` hack in `conftest.py` rather than the eval suite being installed as a proper dependency of the backend package — what's the tradeoff here, and when would this become a real problem?
+
 ## Phase 3 — Observability with Langfuse
 
 ### Step 1 complete: LangGraph tracing via Langfuse's LangChain integration
