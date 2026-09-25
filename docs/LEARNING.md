@@ -153,6 +153,18 @@ Pattern B (full backend proxy) is still the right answer for one different reaso
 
 **Closes the Phase 4 deferral:** the "safety" eval category (prompt injection → expected safe behavior) was explicitly left unbuilt back then, since testing it before any defense existed would only prove "yes, vulnerable." Now there's something real to measure against.
 
+### Step 6 complete: rate limiting
+`backend/app/rate_limit.py` - in-memory sliding-window limiter (20 requests/60s default), keyed by API key rather than IP, since API key is the identity we actually want to cap (maps naturally to per-store usage/billing, and multiple real customers can legitimately share an IP - a school, an office - which per-IP limiting would wrongly penalize). Same "in-memory, not multi-process-safe" honest caveat as session memory and Chroma collections - a real deployment needs Redis. `verify_api_key` (`auth.py`) now returns the validated key string instead of `None`, threaded through FastAPI's `Depends()` into the route handler so it can be used as the rate-limit key. Ordering in `/chat`: rate limit check runs before the prompt-injection check - cheapest, most decisive check first, no point spending a Groq call on the guard model for a request that's already over budget. Verified: pure-logic test with a small window (no real API calls needed) confirms exact allow/block behavior, plus a real HTTP request confirmed still works normally under the default limit.
+
+### Real finding while re-running the full suite: LLM non-determinism caught by the eval suite itself
+A rerun of the full suite (unrelated to rate limiting - just routine re-verification) surfaced a genuine failure: `test_policy_faithfulness[Do you ship internationally?]` scored 0.5 (below the 0.7 threshold), previously a clean 1.0 in Phase 4. Investigated rather than dismissed: reran the same question 3 times directly. 2/3 were clean ("We don't ship internationally... delivered within the country only"), 1/3 produced an ambiguous sentence ("you can still place an order, but it will be processed and shipped only within the country") that reads as self-contradictory even though the core fact was stated correctly first.
+
+Two real lessons, not just an inconvenience to route around:
+1. **`temperature=0` does not guarantee deterministic output** from a hosted LLM API - routing/batching/backend differences can still produce different phrasing across calls.
+2. **LLM-as-judge metrics penalize ambiguous phrasing, not only factual errors** - the underlying fact was correct both times, but one phrasing read as contradictory.
+
+**Deliberately did not hand-tune the system prompt to force this specific case to always score 1.0** - that would be overfitting to one eval case rather than genuinely improving the agent, and would undermine the honesty the whole eval suite depends on. Confirmed via a fresh full run afterward (27 passed, 1 xfailed) that this was a real flake, not a persistent regression. The correct way to treat LLM eval results going forward: as a trend across repeated runs, not a single verdict - worth remembering whenever reporting a score to anyone.
+
 ## Interview Questions — Phase 5, Step 3 (Prompt Injection)
 
 **Basic**

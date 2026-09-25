@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from app.agent.graph import run_agent
 from app.auth import verify_api_key
 from app.guardrails import is_prompt_injection
+from app.rate_limit import check_rate_limit
 
 SAFE_REFUSAL_MESSAGE = (
     "I'm not able to help with that. Is there something else I can help with "
@@ -36,8 +37,11 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-@app.post("/chat", response_model=ChatResponse, dependencies=[Depends(verify_api_key)])
-def chat(request: ChatRequest) -> ChatResponse:
+@app.post("/chat", response_model=ChatResponse)
+def chat(request: ChatRequest, api_key: str = Depends(verify_api_key)) -> ChatResponse:
+    if not check_rate_limit(api_key):
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+
     if is_prompt_injection(request.message):
         return ChatResponse(reply=SAFE_REFUSAL_MESSAGE)
 

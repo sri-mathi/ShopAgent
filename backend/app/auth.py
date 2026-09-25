@@ -12,7 +12,7 @@ _bearer_scheme = HTTPBearer(auto_error=False)
 
 def verify_api_key(
     credentials: HTTPAuthorizationCredentials | None = Depends(_bearer_scheme),
-) -> None:
+) -> str:
     expected_key = os.environ.get("SHOPAGENT_API_KEY")
     if not expected_key:
         raise HTTPException(
@@ -23,3 +23,5 @@ def verify_api_key(
         credentials.credentials, expected_key
     ):
         raise HTTPException(status_code=401, detail="Invalid or missing API key.")
+
+    return credentials.credentials
