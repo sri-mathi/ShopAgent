@@ -4,6 +4,12 @@ from pydantic import BaseModel
 
 from app.agent.graph import run_agent
 from app.auth import verify_api_key
+from app.guardrails import is_prompt_injection
+
+SAFE_REFUSAL_MESSAGE = (
+    "I'm not able to help with that. Is there something else I can help with "
+    "regarding your order, our products, or store policies?"
+)
 
 app = FastAPI(title="ShopAgent-OS API")
 
@@ -23,6 +29,7 @@ def health_check() -> dict[str, str]:
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
+    customer_email: str | None = None
 
 
 class ChatResponse(BaseModel):
@@ -31,8 +38,15 @@ class ChatResponse(BaseModel):
 
 @app.post("/chat", response_model=ChatResponse, dependencies=[Depends(verify_api_key)])
 def chat(request: ChatRequest) -> ChatResponse:
+    if is_prompt_injection(request.message):
+        return ChatResponse(reply=SAFE_REFUSAL_MESSAGE)
+
     try:
-        reply = run_agent(request.message, session_id=request.session_id)
+        reply = run_agent(
+            request.message,
+            session_id=request.session_id,
+            customer_email=request.customer_email,
+        )
     except Exception:
         raise HTTPException(
             status_code=500,

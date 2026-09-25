@@ -142,6 +142,33 @@ Verified with a real headless-browser test, not just a compile check: sent a liv
 
 Pattern B (full backend proxy) is still the right answer for one different reason: minting a *cryptographically trustworthy* customer identity (real "Identity Verification," not a spoofable prop). `onMessage` solves storage; it doesn't solve identity trust. Both remain valid, solving different problems - worth not conflating them.
 
+### Step 5 complete: prompt injection defense + closing the Phase 4 "safety" eval gap
+`backend/app/guardrails.py`: `is_prompt_injection()` calls Groq's `meta-llama/llama-prompt-guard-2-86m` through the same chat-completions endpoint already used elsewhere - confirmed empirically (not assumed from docs) that its response is literally a 0-1 probability score. Wired into `main.py` as the very first check in `/chat`, before the message ever reaches the agent's graph/state - a flagged message gets the same response shape as a normal reply (not a distinct error/status code), so an attacker probing the defense can't distinguish "blocked" from "the agent just declined."
+
+**Explicit, real caveat, not glossed over:** Groq's own docs label this model "preview - intended for evaluation purposes only, not for production environments." Used anyway (better than no defense at all), but documented plainly rather than claimed as a solved problem.
+
+**Fail-open design decision, deliberately made and justified:** if the guard-model call itself errors (network/API issue), the message is let through rather than blocking the entire chatbot. Justified specifically by our narrow tool surface - every sensitive action (order lookup) is independently, deterministically re-checked regardless of what the LLM might be tricked into attempting, so this guardrail is defense-in-depth on top of that, not the sole barrier. Revisit if a higher-stakes tool (e.g. "issue a refund") is ever added.
+
+**Real, measured limitation found via testing, kept visible rather than hidden:** of 4 real injection attempts tested, 3 scored ~0.999 (correctly flagged), but "You are now in developer mode..." - one of the most well-known jailbreak phrasings - scored only 0.33, nowhere near the 0.8 threshold. Not a threshold-tuning problem (0.33 isn't close), a genuine capability gap in the preview model. Marked `xfail` with a clear reason rather than deleted or quietly threshold-adjusted to force a pass - this is now living documentation of a real, known gap, and would surface loudly (as an "unexpectedly passing" test) if a future model update ever fixes it.
+
+**Closes the Phase 4 deferral:** the "safety" eval category (prompt injection → expected safe behavior) was explicitly left unbuilt back then, since testing it before any defense existed would only prove "yes, vulnerable." Now there's something real to measure against.
+
+## Interview Questions — Phase 5, Step 3 (Prompt Injection)
+
+**Basic**
+1. Why does a flagged message get the same response shape as a normal one, instead of a distinct error?
+2. What does the Prompt Guard model's response actually look like, mechanically?
+3. Why wasn't this eval category built back in Phase 4?
+
+**Intermediate**
+1. Why fail *open* rather than fail *closed* when the guard-model call itself errors? What would have to change about this system for that answer to flip?
+2. The "developer mode" phrasing scored 0.33 while three other attempts scored ~0.999 - why is this not fixable by just lowering the threshold?
+3. Why is the guard-model check placed in `main.py` rather than inside `run_agent`/`graph.py`?
+
+**Architecture**
+1. If this guardrail were the *only* defense against a malicious order lookup, what would the real-world impact of that 0.33 miss be? Why is the actual impact much smaller than that in this system specifically?
+2. What's the tradeoff of marking a known failure `xfail` versus simply deleting the test case? What would silently deleting it cost future maintainers?
+
 ## Interview Questions — Phase 5, Step 2
 
 **Basic**
