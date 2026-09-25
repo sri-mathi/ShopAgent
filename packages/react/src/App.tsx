@@ -1,5 +1,7 @@
 import { ShopAgent } from './ShopAgent'
 
+const currentUser = { email: 'alice@example.com' }
+
 function App() {
   return (
     <div style={{ padding: 40, fontFamily: 'system-ui, sans-serif' }}>
@@ -15,10 +17,9 @@ function App() {
         storeId="store_mock_001"
         primaryColor="#16A34A"
         onMessage={(exchange) => {
-          // Stand-in for "call your own backend/DB here" - a real integrator
-          // would POST `exchange` to their own API instead of logging it.
           console.log('CONVERSATION_EXCHANGE', JSON.stringify(exchange))
         }}
+        customerEmail={currentUser.email}
       />
     </div>
   )
