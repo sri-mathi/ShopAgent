@@ -113,6 +113,17 @@ New top-level `evals/` folder (matches original target architecture — sibling 
 
 **Deliberately deferred:** the third original eval category, prompt-injection/safety, is paired with Phase 5 (guardrails) instead of built now — testing injection resistance before any defense exists would only prove "yes, currently vulnerable," which isn't informative until there's a guardrail to measure against.
 
+### Step 2 complete: generalizing evals to DB-backed tools (order lookup, product search)
+Answers a real gap: policy RAG's `FaithfulnessMetric` setup only covered semantically-retrieved text — what about questions answered via `get_order_status`/`search_products`, which return exact structured data, not "approximately relevant" chunks?
+
+Two distinct testing layers turned out to be needed, not one:
+- **`test_order_lookup_exactness.py`** — plain `pytest`, zero AI/DeepEval involved. Since DB-backed tools have exactly one correct answer for a given input (unlike RAG's inherently approximate top-k retrieval), a direct `assert` is both simpler and strictly more rigorous than an LLM judge here. Tests `get_order_status` against real `orders.json` data, including the "unknown order" error case.
+- **`test_db_tool_faithfulness.py`** — same exact `FaithfulnessMetric` class as policy RAG, generalized: captures the *real* `ToolMessage` content from a live agent run (via `.stream()`, same technique as tool-selection tests) as `retrieval_context`, and checks the agent's final phrased answer doesn't add/drop/misstate facts versus what the tool actually returned. Key insight: `FaithfulnessMetric` doesn't care whether "context" came from vector search or a deterministic lookup — it's agnostic to the data source, only checking answer-vs-context consistency.
+
+**Demonstrated the metric isn't a rubber stamp**, not just described it: fed `FaithfulnessMetric` a deliberately fabricated answer (claimed a 90-day return window against real 30-day policy text) — scored 0.0, with the judge's reasoning correctly naming the exact contradictions. Contrasted against all real agent answers scoring 1.0.
+
+All 4 new tests + original 9 pass (13 total across the eval suite).
+
 ## Interview Questions — Phase 4, Step 1
 
 **Basic**
