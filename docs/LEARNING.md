@@ -100,6 +100,19 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 **This completes Phase 1's original 9-step roadmap**: FastAPI scaffold → mock data → product search → policy RAG → order tool → LangGraph tool-calling agent → chat API. End-to-end flow now matches the architecture sketched in the very first message of this project.
 
+## Phase 5 — Security & Guardrails
+
+### Step 1 complete: API key authentication on `/chat`
+`backend/app/auth.py` — a FastAPI dependency (`verify_api_key`) checking `Authorization: Bearer <key>` against `SHOPAGENT_API_KEY` via `secrets.compare_digest` (constant-time comparison, not `==` — plain equality exits at the first mismatched character, which can theoretically leak how many leading characters were correct through response-time differences; costs nothing extra to avoid). Applied only to `/chat` via `dependencies=[Depends(verify_api_key)]` — `/health` stays open, since monitoring/uptime tools typically can't carry secrets and there's nothing sensitive to protect there.
+
+**Important nuance, not glossed over:** this key is not actually secret once shipped — it lives inside the widget's browser JavaScript, readable by anyone via the network tab. This matches the original design's own naming (`apiKey="pk_test_123"` — the `pk_` prefix is Stripe's convention for a *publishable* key, as opposed to a true secret key that never leaves a server). Its honest job is identifying which store a request belongs to and blocking the most opportunistic zero-effort abuse — not cryptographically proving authorization. Real protection against someone who extracts and reuses the key is rate-limiting and revocation (not yet built), not the key's secrecy. Worth remembering: "we added an API key" is not the same claim as "this is now secure."
+
+**Real bug caught and fixed via testing, not by inspection:** a missing `Authorization` header initially returned `403` (FastAPI's `HTTPBearer` default `auto_error` behavior) while a wrong key returned `401` (our own check) — same underlying problem, inconsistent status codes. Standard convention: `401` means "you're not authenticated" (missing or invalid credentials), `403` means "I know who you are, but you're not allowed." Fixed via `HTTPBearer(auto_error=False)` and handling the missing case ourselves for a consistent `401`.
+
+**Widget side:** `apiKey` prop (accepted-but-unused since Phase 2) is now genuinely required (`apiKey: string`, no longer optional) and sent as `Authorization: Bearer ${apiKey}` on every request. Demo app (`App.tsx`) reads its key from `import.meta.env.VITE_SHOPAGENT_API_KEY` rather than hardcoding a real value into committed source — same reasoning as `apiUrl` already being environment-specific, plus the widget's own `.env` needed an explicit `.gitignore` entry (Vite's scaffolded gitignore only covers `*.local`, not plain `.env`).
+
+Verified all three cases against the live server: no header → 401, wrong key → 401, correct key → 200 with a real grounded reply. Confirmed the full widget flow still works end-to-end in a real browser with the auth header attached.
+
 ## Phase 4 — Evaluation with DeepEval
 
 ### Step 1 complete: tool-selection + policy-grounding evals

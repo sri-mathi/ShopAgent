@@ -3,7 +3,7 @@ import { FiMessageCircle, FiSend, FiX } from 'react-icons/fi'
 
 export interface ShopAgentProps {
   apiUrl: string
-  apiKey?: string
+  apiKey: string
   storeId?: string
   primaryColor?: string
 }
@@ -13,7 +13,7 @@ interface ChatMessage {
   content: string
 }
 
-export function ShopAgent({ apiUrl, primaryColor = '#6366F1' }: ShopAgentProps) {
+export function ShopAgent({ apiUrl, apiKey, primaryColor = '#6366F1' }: ShopAgentProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
@@ -31,7 +31,10 @@ export function ShopAgent({ apiUrl, primaryColor = '#6366F1' }: ShopAgentProps) 
     try {
       const response = await fetch(`${apiUrl}/chat`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
         body: JSON.stringify({ message: text, session_id: sessionId }),
       })
 

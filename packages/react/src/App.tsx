@@ -11,6 +11,7 @@ function App() {
       </p>
       <ShopAgent
         apiUrl="http://127.0.0.1:8010"
+        apiKey={import.meta.env.VITE_SHOPAGENT_API_KEY}
         storeId="store_mock_001"
         primaryColor="#16A34A"
       />

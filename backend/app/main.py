@@ -1,8 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 from app.agent.graph import run_agent
+from app.auth import verify_api_key
 
 app = FastAPI(title="ShopAgent-OS API")
 
@@ -28,7 +29,7 @@ class ChatResponse(BaseModel):
     reply: str
 
 
-@app.post("/chat", response_model=ChatResponse)
+@app.post("/chat", response_model=ChatResponse, dependencies=[Depends(verify_api_key)])
 def chat(request: ChatRequest) -> ChatResponse:
     try:
         reply = run_agent(request.message, session_id=request.session_id)
