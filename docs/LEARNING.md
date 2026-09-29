@@ -100,6 +100,24 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 **This completes Phase 1's original 9-step roadmap**: FastAPI scaffold → mock data → product search → policy RAG → order tool → LangGraph tool-calling agent → chat API. End-to-end flow now matches the architecture sketched in the very first message of this project.
 
+## Phase 7 — NPM/PyPI Packaging
+
+### Step 1 complete: npm library build for `@shopagent/react`
+`src/index.ts` (new barrel export), `vite.config.ts` (added `build.lib`), `package.json` (renamed to `@shopagent/react`, `react`/`react-dom` moved from `dependencies` to `peerDependencies` + kept in `devDependencies` for local dev).
+
+**Core concept:** a published component library must NOT bundle its own copy of React - if the consumer's app also has React (which every React app does), two separate React instances break hooks at runtime ("invalid hook call"). Fixed via `rollupOptions.external: ['react', 'react-dom', 'react/jsx-runtime']` + `peerDependencies` - verified concretely by the output size (9.84 kB gzipped 3.25 kB; would be hundreds of KB if React were bundled in).
+
+**Real detour:** `vite-plugin-dts@5.1.1` (needed for the `types` field) silently produced zero `.d.ts` files with default settings - no error, just nothing. Root cause: our multi-file TypeScript project-references setup (`tsconfig.json` + `tsconfig.app.json`) wasn't auto-detected; fixed with an explicit `tsconfigPath: 'tsconfig.app.json'`.
+
+### Step 2 complete: vanilla `<script>` embed (`widget.js`), the piece deferred since Phase 2
+`src/widget.tsx` (new self-mounting entry point - creates its own container div, calls `ReactDOM.createRoot().render()` internally, exposes `window.ShopAgent.init(config)`), `vite.widget.config.ts` (separate config: IIFE format, `name: 'ShopAgent'` as the global variable, deliberately **no** `external` - React must be bundled in this time, since a plain HTML page has no bundler to provide it at all).
+
+**Two real, genuinely instructive bugs found via an actual browser test against a real plain-HTML page (not just checking the build succeeded):**
+1. **`ReferenceError: process is not defined`.** React internally reads `process.env.NODE_ENV` to decide dev-vs-production behavior. Vite's normal app-build mode auto-replaces this; library mode does not, since it assumes the consumer's own bundler will. Since this bundle has no further build step at all - it runs raw in a browser - nothing ever did that substitution, so the literal `process.env.NODE_ENV` reference survived into the browser, where `process` doesn't exist. Fixed with an explicit `define: { 'process.env.NODE_ENV': JSON.stringify('production') }`. **Bonus effect:** this also shrank the bundle from 653.96 kB to 226.36 kB - once the value became a compile-time-known literal, dead-code elimination could finally strip out all of React's dev-mode-only warning code, which is a surprisingly large fraction of its bundle size.
+2. **A confusing false alarm, not a real bug:** a test HTML page placed manually into `dist/` disappeared after a rebuild, producing a 404 that looked like a new failure. Actual cause: Vite's default `build.outDir` behavior empties the output directory before every build (`emptyOutDir`) - expected, not a bug, just a reminder that anything manually placed in a build output folder is disposable.
+
+Verified with a real Playwright browser test against `dist/widget.js` served as genuinely static files (`python3 -m http.server`, no dev server, no Vite) - zero console errors, a real floating launcher, and a real grounded chat exchange, on a page with no React/npm/bundler involved at all.
+
 ## Phase 6 — Docker
 
 ### Complete: backend fully containerized, verified end-to-end
