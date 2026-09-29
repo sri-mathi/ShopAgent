@@ -3,8 +3,8 @@ from deepeval import assert_test
 from deepeval.metrics import FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 
-from app.agent.graph import run_agent
-from app.services.policy_rag import retrieve_policy
+from shopagent_core.agent.graph import run_agent
+from shopagent_core.services.policy_rag import retrieve_policy
 from judge_model import GroqJudge
 
 GROUNDING_CASES = [

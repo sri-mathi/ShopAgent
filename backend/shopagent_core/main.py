@@ -2,10 +2,10 @@ from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
-from app.agent.graph import run_agent
-from app.auth import verify_api_key
-from app.guardrails import is_prompt_injection
-from app.rate_limit import check_rate_limit
+from shopagent_core.agent.graph import run_agent
+from shopagent_core.auth import verify_api_key
+from shopagent_core.guardrails import is_prompt_injection
+from shopagent_core.rate_limit import check_rate_limit
 
 SAFE_REFUSAL_MESSAGE = (
     "I'm not able to help with that. Is there something else I can help with "

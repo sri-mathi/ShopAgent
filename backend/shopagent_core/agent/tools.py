@@ -3,9 +3,9 @@ from typing import Literal
 
 from langchain_core.tools import tool
 
-from app.services.order_lookup import get_order_status as _get_order_status
-from app.services.policy_rag import retrieve_policy as _retrieve_policy
-from app.services.product_search import search_products as _search_products
+from shopagent_core.services.order_lookup import get_order_status as _get_order_status
+from shopagent_core.services.policy_rag import retrieve_policy as _retrieve_policy
+from shopagent_core.services.product_search import search_products as _search_products
 
 MOCK_STORE_ID = "store_mock_001"
 
@@ -31,11 +31,16 @@ def search_products(
 
 
 @tool
-def get_order_status(order_id: str) -> str:
-    """Look up a specific order's status by its order ID (e.g. "ORD1001"). Use this
-    when the customer asks where their order is, its delivery status, tracking
-    number, or whether it can still be cancelled."""
-    return json.dumps(_get_order_status(order_id))
+def get_order_status(order_id: str, email: str) -> str:
+    """Look up a specific order's status. Requires BOTH the order ID (e.g.
+    "ORD1001") AND the email address used to place that order, to verify the
+    customer is the order's actual owner. If the customer has only given the
+    order ID, ask them for the email on that order before calling this tool -
+    do not guess or reuse an email from earlier in the conversation for a
+    different order. Use this when the customer asks where their order is,
+    its delivery status, tracking number, or whether it can still be
+    cancelled."""
+    return json.dumps(_get_order_status(order_id, email))
 
 
 @tool

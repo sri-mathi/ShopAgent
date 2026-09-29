@@ -118,6 +118,17 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 Verified with a real Playwright browser test against `dist/widget.js` served as genuinely static files (`python3 -m http.server`, no dev server, no Vite) - zero console errors, a real floating launcher, and a real grounded chat exchange, on a page with no React/npm/bundler involved at all.
 
+### Step 3 complete: renamed `app` → `shopagent_core` (prerequisite for real PyPI packaging)
+The importable package was literally named `app` - fine for a private FastAPI project, but a real problem for anything meant to be `pip install`ed alongside other people's code (a wildly generic name, likely to collide with some other installed package's own `app` module). Renamed via `git mv backend/app backend/shopagent_core` (preserves file history as renames, not delete+recreate - confirmed via `git status` showing `R`/`RM`, not separate deletions and additions).
+
+**What did and didn't need changing, and why:** every `from app.X import Y` across `backend/shopagent_core/` and `evals/` became `from shopagent_core.X import Y`. Two things deliberately did *not* change: (1) the local variable name `app` inside `main.py` (`app = FastAPI(...)`) and `graph.py` (`app = graph.compile()`) - these are just local names, unrelated to the package path, and renaming them would be pure churn; (2) `evals/conftest.py`'s `sys.path` setup - it was already written generically (`Path(__file__).resolve().parent.parent / "backend"`, no hardcoded package name), so it correctly made `shopagent_core` importable with zero edits.
+
+**Scope decision for what belongs in the eventually-published package vs. what stays server-only:** `guardrails.py` and `rate_limit.py` have zero FastAPI-specific imports (one only calls Groq, the other only uses `time`) - genuinely reusable as library code. `main.py` (the FastAPI app/routes) and `auth.py` (directly imports `fastapi.security.HTTPBearer`) stay out - they're the *reference server* that uses the library, not the library itself.
+
+**Honest limitation flagged before implying this is "done":** pip-installing this today still means the agent answers from *our* bundled mock `products.json`/`orders.json`/`policies.md` - services read that data via a hardcoded path. Making the data source itself swappable for someone else's real store is exactly what the `StoreAdapter` pattern (Phase 8) is for; this packaging step makes the *mechanism* reusable, not yet the *data*.
+
+Verified for real, not assumed: recreated the local venv from scratch (the previous one had been deliberately deleted during Docker verification), reran the full eval suite (27 passed, 1 documented xfail - identical to pre-rename), and started the server directly via the new module path (`uvicorn shopagent_core.main:app`) confirming a real `{"status": "ok"}` response.
+
 ## Phase 6 — Docker
 
 ### Complete: backend fully containerized, verified end-to-end

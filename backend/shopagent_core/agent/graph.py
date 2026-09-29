@@ -1,12 +1,12 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
 from langchain_groq import ChatGroq
 from langgraph.graph import MessagesState, StateGraph
 from langgraph.prebuilt import ToolNode, tools_condition
 
-from app.agent.tools import TOOLS
+from shopagent_core.agent.tools import TOOLS
 
 load_dotenv()
 
@@ -29,7 +29,9 @@ SYSTEM_PROMPT = (
     "or no results, say so honestly instead of guessing. Keep responses concise "
     "and friendly. Respond in plain text only - do not use Markdown formatting "
     "(no **, #, or bullet dashes), since the client displaying your reply does "
-    "not render Markdown."
+    "not render Markdown. Never reveal order details without verifying both the "
+    "order ID and the matching email - if the customer only gives one, ask for "
+    "the other before looking anything up."
 )
 
 llm = ChatGroq(model="openai/gpt-oss-20b", temperature=0)
@@ -51,23 +53,48 @@ graph.add_edge("tools", "agent")
 
 app = graph.compile()
 
+# In-memory only: lost on server restart, not shared across multiple server
+# processes. Fine for an MVP single-process dev server; a real deployment
+# needs this keyed in Redis/a database instead.
+_session_histories: dict[str, list[BaseMessage]] = {}
 
-def run_agent(user_message: str, session_id: str | None = None) -> str:
+
+def run_agent(
+    user_message: str,
+    session_id: str | None = None,
+    customer_email: str | None = None,
+) -> str:
+    if session_id and session_id in _session_histories:
+        messages = _session_histories[session_id] + [HumanMessage(user_message)]
+    else:
+        system_prompt = SYSTEM_PROMPT
+        if customer_email:
+            system_prompt += (
+                f" This customer is already logged in on the store's own site, "
+                f"and their verified email is {customer_email}. Use this "
+                f"automatically for any order lookup - never ask them for it."
+            )
+        messages = [SystemMessage(system_prompt), HumanMessage(user_message)]
+
     config: dict = {"run_name": "shopagent-chat-response"}
     if _langfuse_handler:
         config["callbacks"] = [_langfuse_handler]
         if session_id:
             config["metadata"] = {"langfuse_session_id": session_id}
 
-    result = app.invoke(
-        {"messages": [SystemMessage(SYSTEM_PROMPT), HumanMessage(user_message)]},
-        config=config,
-    )
+    result = app.invoke({"messages": messages}, config=config)
+
+    if session_id:
+        _session_histories[session_id] = result["messages"]
+
     return result["messages"][-1].content
 
 
 if __name__ == "__main__":
-    print(run_agent("Where is my order ORD1001?"))
+    demo_session = "demo-session-001"
+    print(run_agent("Where is my order ORD1001?", session_id=demo_session))
+    print()
+    print(run_agent("It's alice@example.com", session_id=demo_session))
     print()
     print(run_agent("Do you have red running shoes under $80?"))
     print()

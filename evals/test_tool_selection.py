@@ -1,11 +1,11 @@
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from app.agent.graph import SYSTEM_PROMPT, app
+from shopagent_core.agent.graph import SYSTEM_PROMPT, app
 
 TOOL_SELECTION_CASES = [
-    ("Where is order ORD1001?", "get_order_status"),
-    ("What's the status of my order ORD1005?", "get_order_status"),
+    ("Where is order ORD1001? My email is alice@example.com", "get_order_status"),
+    ("What's the status of my order ORD1005? My email is dave@example.com", "get_order_status"),
     ("Do you have red running shoes under $80?", "search_products"),
     ("What electronics do you have in stock?", "search_products"),
     ("Can I return an item after 20 days?", "search_policies"),

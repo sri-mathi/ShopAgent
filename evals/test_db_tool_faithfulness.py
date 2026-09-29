@@ -4,11 +4,11 @@ from deepeval.metrics import FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 
-from app.agent.graph import SYSTEM_PROMPT, app
+from shopagent_core.agent.graph import SYSTEM_PROMPT, app
 from judge_model import GroqJudge
 
 DB_GROUNDING_CASES = [
-    "Where is order ORD1005?",
+    "Where is order ORD1005? My email is dave@example.com",
     "What electronics do you have in stock?",
 ]
 

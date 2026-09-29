@@ -26,7 +26,7 @@ Edit `backend/.env` and fill in your own keys (see the table below for where
 to get each one). Then run:
 
 ```bash
-uvicorn app.main:app --reload --port 8010
+uvicorn shopagent_core.main:app --reload --port 8010
 ```
 
 Check it's alive: `curl http://127.0.0.1:8010/health` should return

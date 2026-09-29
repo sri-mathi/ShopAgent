@@ -1,6 +1,6 @@
 import uuid
 
-from app.rate_limit import check_rate_limit
+from shopagent_core.rate_limit import check_rate_limit
 
 
 def test_allows_requests_under_the_limit():
