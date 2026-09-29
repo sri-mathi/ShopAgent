@@ -100,6 +100,40 @@ Verified: real chat request returns a grounded answer, missing `message` field r
 
 **This completes Phase 1's original 9-step roadmap**: FastAPI scaffold → mock data → product search → policy RAG → order tool → LangGraph tool-calling agent → chat API. End-to-end flow now matches the architecture sketched in the very first message of this project.
 
+## Phase 6 — Docker
+
+### Complete: backend fully containerized, verified end-to-end
+`backend/Dockerfile`, `backend/.dockerignore`, `docker-compose.yml` — the backend now runs identically via `docker compose up`, with no local venv involved at all. This phase produced an unusually rich set of *real* bugs, each one genuinely instructive, none hypothetical:
+
+**1. Legacy `docker-compose` v1 vs. modern Compose V2.** The machine had the old standalone `docker-compose` (v1.29.2, Python-based, unmaintained since 2021) but not the integrated `docker compose` plugin. v1 talks to the Docker daemon via a custom `http+docker://` URL scheme registered through `requests`/`urllib3` - a trick that breaks under modern `urllib3` v2.x (a very commonly hit compatibility wall). Fixed by installing the actual Compose V2 plugin (`docker-compose-v2` on this Ubuntu system) rather than patching around the broken legacy tool.
+
+**2. `requirements.txt` had silently drifted from reality.** `groq==1.7.0` and `python-dotenv==1.0.1` were the versions *first* pinned early in the project - but later `pip install`s (for `langchain-groq`, then `deepeval`) silently downgraded/upgraded them in the *local* venv to satisfy real constraints (`groq<1.0.0` for langchain-groq; `python-dotenv>=1.1.1` for deepeval), without `requirements.txt` ever being corrected to match. This was invisible locally because our venv evolved incrementally, one `pip install` at a time, over many sessions - each install only checks compatibility against what's *already there*, not a full fresh resolution. Docker's build does a genuine clean-room, single-pass resolution from the declared file, and caught it immediately (`ResolutionImpossible`). This is a concrete, real demonstration of *why* reproducible builds matter, not an abstract argument for it. Fixed by correcting the pins to what was actually installed and proven working (`groq==0.37.1`, `python-dotenv==1.2.3`).
+
+**3. `torch`'s default PyPI wheel bundles full NVIDIA CUDA/GPU support.** Pulling in `cuda-toolkit`, `nvidia-cudnn`, `nvidia-cublas`, and more - multiple GB combined - for a container that only ever runs a small embedding model on CPU. This caused a real build failure (`ReadTimeoutError` downloading a 553MB CUDA package). Fixed by installing torch from PyTorch's dedicated CPU-only index (`https://download.pytorch.org/whl/cpu`) *before* the main `requirements.txt` install, so `sentence-transformers`'s transitive `torch` requirement finds it already satisfied and never pulls the GPU variant. Verified via dry-run in an isolated venv before rebuilding, twice, given how expensive each real build attempt was.
+
+**4. A failed container start left behind a broken, portless container object.** The first successful build hit "address already in use" on port 8010 (the local dev server was still running) - and Docker's container-creation had already completed by the time the port-binding step failed, leaving a `Created` (but never successfully started) container behind. A later plain `docker compose up` (no rebuild/recreate) found and reused that same stale container - with no port mapping ever properly attached to it, since binding is exactly what failed the first time. `docker ps` revealed this concretely: every other container on the machine showed real port mappings; ours showed a blank `PORTS` column. Fixed with `docker compose down && docker compose up` to force a clean recreate rather than continuing to debug a half-broken leftover.
+
+**Bonus, unrelated closure:** `docker ps` also revealed an `mlops_api` container on port 8001 - almost certainly the exact mystery "model server" (`{"status": "healthy", "model_loaded": true, ...}`) encountered while picking a free port back in Step 1 of this whole project.
+
+**Process note, itself worth remembering:** partway through this phase, the user explicitly corrected the collaboration mode - stop building/running things automatically, guide instead, since this is meant to be hands-on learning. Reset to: explain Dockerfile/Compose concepts, give the user a scoped task with explicit constraints, they attempt it; for a couple of specific pieces they asked me to build directly and explain thoroughly instead (their explicit choice each time, not autonomous drift). All the actual `docker`/`docker compose` commands themselves were run by the user throughout - I only investigated root causes (dry-run dependency checks in isolated scratch venvs) and edited config files, never executed the real build/run commands directly.
+
+## Interview Questions — Phase 6 (Docker)
+
+**Basic**
+1. Why does the Dockerfile copy `requirements.txt` and run `pip install` *before* copying the rest of the application code?
+2. Why must uvicorn bind to `0.0.0.0` inside a container instead of `127.0.0.1`?
+3. What does `.dockerignore` actually prevent, mechanically?
+4. Why is `.env` never copied into the image, and how does the container get real secrets at all?
+
+**Intermediate**
+1. Why did the `groq`/`python-dotenv` version conflicts only show up in the Docker build, never locally, despite the exact same `requirements.txt` existing the whole time?
+2. Why does installing CPU-only `torch` first prevent the GPU variant from being pulled in later, rather than needing to explicitly exclude the `nvidia-*` packages?
+3. Why did reusing a stale, previously-failed container (instead of recreating it) result in a container with no port mapping at all, rather than just the old, wrong port mapping?
+
+**Architecture**
+1. What's the actual difference between what `docker build` does and what `docker run`/`docker compose up` does — trace which of our real bugs belongs to which phase.
+2. If this container were deployed to a real multi-replica production environment tomorrow, which of the in-memory, single-process assumptions we've built up over this whole project (session memory, rate limiting, Chroma collections) would break first, and why?
+
 ## Phase 5 — Security & Guardrails
 
 ### Step 1 complete: API key authentication on `/chat`
