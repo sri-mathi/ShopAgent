@@ -5,11 +5,13 @@ from langchain_core.tools import tool
 
 from shopagent_core.services.order_lookup import get_order_status as _get_order_status
 from shopagent_core.services.policy_rag import retrieve_policy as _retrieve_policy
-from shopagent_core.services.product_search import search_products as _search_products
+from shopagent_core.store_config import get_store_adapter
 
-MOCK_STORE_ID = "store_mock_001"
+STORE_ID = "default"
 
 ProductCategory = Literal["shoes", "electronics", "home", "fitness"]
+
+_adapter = get_store_adapter()
 
 
 @tool
@@ -24,10 +26,10 @@ def search_products(
     running shoes under $80?"). `category` must be one of: shoes, electronics,
     home, fitness. For more specific terms like "running" or "hiking", pass them
     via `keyword` instead of `category`. Any filter can be omitted."""
-    results = _search_products(
+    results = _adapter.get_products(
         keyword=keyword, category=category, color=color, max_price=max_price
     )
-    return json.dumps(results)
+    return json.dumps([product.model_dump() for product in results])
 
 
 @tool
@@ -40,7 +42,7 @@ def get_order_status(order_id: str, email: str) -> str:
     different order. Use this when the customer asks where their order is,
     its delivery status, tracking number, or whether it can still be
     cancelled."""
-    return json.dumps(_get_order_status(order_id, email))
+    return json.dumps(_get_order_status(_adapter, order_id, email))
 
 
 @tool
@@ -48,7 +50,7 @@ def search_policies(query: str) -> str:
     """Search the store's shipping, return, refund, warranty, and cancellation
     policies. Use this when the customer asks a policy question (e.g. "can I
     return this?", "do you ship internationally?")."""
-    return json.dumps(_retrieve_policy(query, store_id=MOCK_STORE_ID))
+    return json.dumps(_retrieve_policy(query, store_id=STORE_ID, adapter=_adapter))
 
 
 TOOLS = [search_products, get_order_status, search_policies]

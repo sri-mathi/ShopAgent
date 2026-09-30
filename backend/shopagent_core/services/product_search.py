@@ -1,11 +1,11 @@
 import json
 from pathlib import Path
 
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "products.json"
+DEFAULT_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "products.json"
 
 
-def load_products() -> list[dict]:
-    with open(DATA_PATH) as f:
+def load_products(products_path: str | Path | None = None) -> list[dict]:
+    with open(products_path or DEFAULT_DATA_PATH) as f:
         return json.load(f)
 
 
@@ -14,8 +14,9 @@ def search_products(
     category: str | None = None,
     color: str | None = None,
     max_price: float | None = None,
+    products_path: str | Path | None = None,
 ) -> list[dict]:
-    products = load_products()
+    products = load_products(products_path)
     results = []
 
     for product in products:

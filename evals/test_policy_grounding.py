@@ -3,6 +3,7 @@ from deepeval import assert_test
 from deepeval.metrics import FaithfulnessMetric
 from deepeval.test_case import LLMTestCase
 
+from shopagent_core.adapters.json_file_store import JSONFileStoreAdapter
 from shopagent_core.agent.graph import run_agent
 from shopagent_core.services.policy_rag import retrieve_policy
 from judge_model import GroqJudge
@@ -14,11 +15,12 @@ GROUNDING_CASES = [
 ]
 
 judge = GroqJudge()
+adapter = JSONFileStoreAdapter()
 
 
 @pytest.mark.parametrize("question", GROUNDING_CASES)
 def test_policy_faithfulness(question):
-    retrieved_chunks = retrieve_policy(question, store_id="store_mock_001")
+    retrieved_chunks = retrieve_policy(question, store_id="default", adapter=adapter)
     retrieval_context = [chunk["content"] for chunk in retrieved_chunks]
     actual_output = run_agent(question)
 

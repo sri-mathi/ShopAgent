@@ -244,6 +244,27 @@ Two real lessons, not just an inconvenience to route around:
 1. If this guardrail were the *only* defense against a malicious order lookup, what would the real-world impact of that 0.33 miss be? Why is the actual impact much smaller than that in this system specifically?
 2. What's the tradeoff of marking a known failure `xfail` versus simply deleting the test case? What would silently deleting it cost future maintainers?
 
+## Phase 8 — Store Adapters
+
+### Complete: `StoreAdapter` interface, `JSONFileStoreAdapter`, and env-configurable data
+**Scope correction made mid-design, worth remembering:** the user's actual goal was a self-hosted, single-store deployment ("configure your env and data, install the packages, use it") - not a multi-tenant SaaS routing many stores per-request. Building a full store registry (dict keyed by `store_id`, looked up per incoming request) would have been solving a problem that doesn't exist yet. Landed on one adapter, configured once at startup from environment variables (`store_config.py`'s `get_store_adapter()`) - simpler, honest about what's actually needed, still leaves the real registry as a clean future extension for actual multi-tenant SaaS.
+
+**The interface** (`adapters/base.py`, `abc.ABC` with `@abstractmethod`) has exactly three methods, each deliberately answering the *dumbest possible question*: `get_products(...)`, `get_order(order_id) -> Order | None` (by ID alone, no email), `get_policy_documents() -> str` (raw text only). Verified the ABC's runtime enforcement directly: instantiating `StoreAdapter()` raises `TypeError` naming every missing method.
+
+**The key design principle, discovered by working through it out loud, not assumed upfront:** anything correctness- or security-sensitive stays centralized in `services/`, never delegated to adapter implementers. Two concrete applications:
+1. **Order ownership** - `get_order_status(adapter, order_id, email)` in `services/order_lookup.py` calls `adapter.get_order(order_id)` and does the email check *itself*, returning the same generic error for "wrong email" and "nonexistent order" regardless of which adapter is plugged in. If every adapter author had to reimplement this, the anti-enumeration guarantee from Phase 5 would only be as strong as the least careful adapter author.
+2. **Policy RAG** - adapters only return raw policy text via `get_policy_documents()`; `services/policy_rag.py`'s existing chunking/embedding/Chroma pipeline (unchanged) does the actual retrieval. Third-party adapter authors never need to implement RAG themselves.
+
+**Canonical models** (`models.py`): `Product`, `Order` (Pydantic) - the concrete realization of the "canonical schema" idea from the very first schema-matching discussion early in this project. Every adapter must return *these* shapes; malformed data now fails loudly via Pydantic validation instead of silently downstream.
+
+**`JSONFileStoreAdapter`** - the default, flat-file-backed adapter (renamed from an earlier "MockStoreAdapter" framing once it became clear this is genuinely reusable, not just an internal test fixture). Reads `SHOPAGENT_PRODUCTS_PATH`/`SHOPAGENT_ORDERS_PATH`/`SHOPAGENT_POLICIES_PATH` env vars, defaulting to the bundled mock data if unset - reuses the *existing, already-tested* `product_search.py`/`order_lookup.py`/`policy_rag.py` functions (each given a new optional path parameter, fully backward compatible) rather than duplicating their logic.
+
+**Proof, not just claims:** pointed `SHOPAGENT_PRODUCTS_PATH` at a scratch file containing one fictional product ("Galactic Hoverboard") that exists nowhere in the bundled mock data, and the running agent answered from it - zero code changes, env var only. This is the literal, concrete realization of "a store owner can configure their own data."
+
+**New deliverable for third-party developers:** `docs/BUILDING_A_STORE_ADAPTER.md` - the exact schema for flat-file integration, and the interface + centralization principle for anyone writing a real custom adapter (Shopify, WooCommerce, a real database).
+
+Full eval suite (28 tests) reran clean after this refactor: 27 passed, 1 documented `xfail`, identical to before - confirming the large restructure (3 service files, tools.py rewire, 2 eval test files) introduced no regressions.
+
 ## Interview Questions — Phase 5, Step 2
 
 **Basic**

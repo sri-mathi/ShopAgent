@@ -4,7 +4,9 @@ from pathlib import Path
 import chromadb
 from sentence_transformers import SentenceTransformer
 
-DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "policies.md"
+from shopagent_core.adapters.base import StoreAdapter
+
+DEFAULT_DATA_PATH = Path(__file__).resolve().parent.parent / "data" / "policies.md"
 
 HEADING_PATTERN = re.compile(r"^## (.+)$", re.MULTILINE)
 
@@ -15,8 +17,8 @@ _chroma_client: chromadb.ClientAPI | None = None
 _collection_cache: dict[str, chromadb.Collection] = {}
 
 
-def load_policy_text() -> str:
-    with open(DATA_PATH) as f:
+def load_policy_text(policies_path: str | Path | None = None) -> str:
+    with open(policies_path or DEFAULT_DATA_PATH) as f:
         return f.read()
 
 
@@ -77,7 +79,7 @@ def embed_texts(texts: list[str]) -> list[list[float]]:
     return embeddings.tolist()
 
 
-def get_collection(store_id: str) -> chromadb.Collection:
+def get_collection(store_id: str, adapter: StoreAdapter) -> chromadb.Collection:
     global _chroma_client
 
     if store_id in _collection_cache:
@@ -91,7 +93,7 @@ def get_collection(store_id: str) -> chromadb.Collection:
         metadata={"hnsw:space": "cosine"},
     )
 
-    text = load_policy_text()
+    text = adapter.get_policy_documents()
     chunks = chunk_policies(text, store_id=store_id)
     embeddings = embed_texts([chunk["content"] for chunk in chunks])
 
@@ -109,10 +111,11 @@ def get_collection(store_id: str) -> chromadb.Collection:
 def retrieve_policy(
     query: str,
     store_id: str,
+    adapter: StoreAdapter,
     top_k: int = 3,
     min_similarity: float = 0.3,
 ) -> list[dict]:
-    collection = get_collection(store_id)
+    collection = get_collection(store_id, adapter)
     query_embedding = embed_texts([query])[0]
 
     results = collection.query(
