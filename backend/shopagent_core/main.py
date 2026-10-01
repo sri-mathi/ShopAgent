@@ -1,3 +1,5 @@
+import os
+
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -6,6 +8,15 @@ from shopagent_core.agent.graph import run_agent
 from shopagent_core.auth import verify_api_key
 from shopagent_core.guardrails import is_prompt_injection
 from shopagent_core.rate_limit import check_rate_limit
+
+# Fail loudly at container startup, not on the first real customer request -
+# a misconfigured deployment should show up immediately in deploy logs, not
+# as a silent 500 the first time someone actually chats.
+if not os.environ.get("SHOPAGENT_API_KEY"):
+    raise RuntimeError(
+        "SHOPAGENT_API_KEY is not set. The server will not start without it - "
+        "see backend/.env.example."
+    )
 
 SAFE_REFUSAL_MESSAGE = (
     "I'm not able to help with that. Is there something else I can help with "
