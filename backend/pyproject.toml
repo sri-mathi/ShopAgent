@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 langfuse = ["langfuse>=4.15.6", "langchain>=1.4.2"]
+shopify = ["requests>=2.34.2"]
 
 [tool.setuptools.packages.find]
 include = ["shopagent_core*"]

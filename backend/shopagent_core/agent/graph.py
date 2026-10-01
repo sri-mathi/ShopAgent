@@ -1,14 +1,18 @@
 import os
 
 from dotenv import load_dotenv
-from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
-from langchain_groq import ChatGroq
-from langgraph.graph import MessagesState, StateGraph
-from langgraph.prebuilt import ToolNode, tools_condition
 
-from shopagent_core.agent.tools import TOOLS
+load_dotenv()  # must run before any of our own modules, since several of
+# them (e.g. store_config.py) read os.environ at import time to build
+# module-level singletons - importing them first would see an empty
+# environment regardless of what .env actually contains.
 
-load_dotenv()
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage  # noqa: E402
+from langchain_groq import ChatGroq  # noqa: E402
+from langgraph.graph import MessagesState, StateGraph  # noqa: E402
+from langgraph.prebuilt import ToolNode, tools_condition  # noqa: E402
+
+from shopagent_core.agent.tools import TOOLS  # noqa: E402
 
 LANGFUSE_ENABLED = bool(os.environ.get("LANGFUSE_PUBLIC_KEY")) and bool(
     os.environ.get("LANGFUSE_SECRET_KEY")

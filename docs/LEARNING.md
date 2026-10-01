@@ -265,6 +265,24 @@ Two real lessons, not just an inconvenience to route around:
 
 Full eval suite (28 tests) reran clean after this refactor: 27 passed, 1 documented `xfail`, identical to before - confirming the large restructure (3 service files, tools.py rewire, 2 eval test files) introduced no regressions.
 
+## Phase 9 — Real Shopify Integration
+
+### Complete: `ShopifyAdapter` against a real dev store, with a real, multi-bug debugging story
+Built a real `StoreAdapter` implementation backed by Shopify's Admin GraphQL API - the actual payoff of Phase 8's design: zero changes to `tools.py`'s tool definitions, `graph.py`, or any security-centralized logic. Only a new adapter class and a `STORE_ADAPTER_TYPE` env-var switch in `store_config.py` (`"json"` default, `"shopify"` to use this).
+
+**Setup involved real external infrastructure most other phases didn't:** a free Shopify Partner account, a dev store, and a custom app - genuinely different from just generating another API key, and worth remembering as the reason this phase was flagged "slowest" from the very start of the roadmap.
+
+**Shopify's app-creation flow changed meaningfully as of January 1, 2026** - legacy custom apps (a single static Admin API token, shown once) are deprecated for new apps. The current flow (Dev Dashboard) instead issues a **Client ID + Client Secret**, exchanged programmatically for a short-lived (24h) access token via the OAuth client-credentials grant - `ShopifyAdapter._get_access_token()` caches and refreshes it automatically rather than storing one permanent token. Verified the exact request/response shape by fetching Shopify's live docs rather than trusting training-data memory, which would have described the now-deprecated flow.
+
+**Real bugs hit and fixed, in the order encountered:**
+1. **`app_not_installed`** - creating an app in the Dev Dashboard doesn't automatically install it on a store; that's a separate step (an "Installs" section with its own button).
+2. **`ACCESS_DENIED` for the products field** - API scopes for Dev Dashboard apps are tied to app *versions*, not a simple checkbox list like the old flow - scopes have to be set and the version explicitly *released* before they take effect.
+3. **The `load_dotenv()` ordering bug** - `graph.py` called `load_dotenv()` on line 11, but `from shopagent_core.agent.tools import TOOLS` on line 9 already triggered `store_config.py`'s module-level adapter singleton, which read `os.environ.get("STORE_ADAPTER_TYPE")` *before* `.env` was loaded at all - always saw an empty environment and silently defaulted to the mock store, no error, just wrong behavior. The exact same bug class Langfuse's own docs warned about in Phase 3 ("import Langfuse after loading environment variables"), just hit again with our own module this time. Fixed by moving `load_dotenv()` to the very top of the file, before any of our own internal imports.
+4. **A corrupted `.env` line** - `echo "STORE_ADAPTER_TYPE=shopify" >> backend/.env` appended onto the *same line* as the preceding `SHOPIFY_CLIENT_SECRET` entry, because that line had no trailing newline - silently corrupting the secret's value (breaking auth) while also meaning the new variable was never actually set. A reminder that `>>` is a byte-level append, not a "new line" guarantee.
+5. **Eval-suite test isolation gap** - once `.env` had `STORE_ADAPTER_TYPE=shopify` set (for real, deliberate Shopify testing), the *eval suite* silently started testing the live agent against the live Shopify store instead of the mock data it was built and tuned around - one test failed for a completely unrelated, non-bug reason (`ORD1002` genuinely doesn't exist in the real store). Fixed properly in `evals/conftest.py`: force `os.environ["STORE_ADAPTER_TYPE"] = "json"` before any `shopagent_core` module gets imported. General lesson: **eval suites must never depend on ambient developer-environment state** - they test known behavior against known data, regardless of whatever a developer's own `.env` happens to be pointed at that day.
+
+**Final verification, both directly and through the full agent:** `get_products()` returned 14 real products from the dev store's generated test data (snowboards, accessories); asking the live agent "What products do you have?" correctly answered from that real catalog, not the bundled mock data - proof the entire pipeline (adapter -> tools -> LangGraph -> LLM) works against a genuine external system, not just a plausible-looking mock.
+
 ## Interview Questions — Phase 5, Step 2
 
 **Basic**
