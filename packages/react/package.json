@@ -1,6 +1,14 @@
 {
   "name": "@elthratech/shopagent-react",
-  "version": "0.1.0",
+  "version": "0.1.1",
+  "description": "Drop-in React chat widget for ShopAgent-OS, a self-hosted e-commerce AI agent. Answers product, order status, and policy questions against your own store backend.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sri-mathi/ShopAgent.git",
+    "directory": "packages/react"
+  },
+  "keywords": ["shopagent", "ecommerce", "chatbot", "ai-agent", "react", "customer-support"],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",
